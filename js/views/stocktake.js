@@ -38,12 +38,12 @@ export function render(ctx) {
         const g = est === null ? null : Logic.round2(Math.abs(v - est));
         return `<div class="acct"><label class="nm" for="acc${i}">${esc(a.name)}${a.note ? ` <span class="chip plain">${esc(a.note)}</span>` : ''}${a.biz ? ' <span class="chip biz">💼 生意</span>' : ''}</label>
           <input id="acc${i}" class="num" inputmode="decimal" value="${esc(st.values[a.name])}" data-stock="${esc(a.name)}">
-          <div class="prev"><span>上月 ${money(p)}${a.where ? ` · 去 ${esc(a.where)} 看` : ''}</span><span class="num ${dl > 0 ? 'up' : dl < 0 ? 'down' : ''}">${dl === 0 ? '沒變' : (dl > 0 ? '▲ ' : '▼ ') + money(Math.abs(dl))}</span></div>
-          ${est !== null && a.group === 'daily' ? `<div class="prev"><span>App 推算 ${money(est)}（還卡、充 TNG 沒記，會偏高）</span><span class="num ${g > 500 ? 'down' : 'up'}">${g > 500 ? `⚠ 差 ${money(g)}，可能漏記` : `✓ 差 ${money(g)}`}</span></div>` : ''}
+          <div class="prev"><span>上月 ${money(p)}${a.where ? ` · 去 ${esc(a.where)} 看` : ''}</span><span id="dl${i}" class="${deltaCls(dl)}">${deltaText(dl)}</span></div>
+          ${est !== null && a.group === 'daily' ? `<div class="prev"><span>App 推算 ${money(est)}（還卡、充 TNG 沒記，會偏高）</span><span id="gp${i}" class="${gapCls(g)}">${gapText(g)}</span></div>` : ''}
         </div>`;
       }).join('')}
       <div class="total"><span>💰 我全部的錢</span><span class="num" id="stTotal">${fmt(total)}</span></div>
-      <div style="text-align:right;font-size:13px" class="num ${diff >= 0 ? 'up' : 'down'}">${diff >= 0 ? '▲' : '▼'} ${money(Math.abs(diff))} 比上月</div>
+      <div style="text-align:right;font-size:13px" id="stDiff" class="num ${diff >= 0 ? 'up' : 'down'}">${diff >= 0 ? '▲' : '▼'} ${money(Math.abs(diff))} 比上月</div>
     </div>
     <div class="panel"><h3><span>${pmLabel}收入</span><button class="link" data-addmode="in">＋ 補記收入</button></h3>
       ${bySource.map(x => `<div class="bizline"><span>${esc(x.src.name)} ${x.src.biz ? '<span class="chip biz">💼 生意</span>' : '<span class="chip plain">🧑 個人</span>'} <span class="chip plain">報 Form B</span></span><span class="num">${money(x.total)}</span></div>`).join('')}
@@ -58,15 +58,29 @@ export function render(ctx) {
   </div>`;
 }
 
+const deltaCls = dl => 'num ' + (dl > 0 ? 'up' : dl < 0 ? 'down' : '');
+const deltaText = dl => dl === 0 ? '沒變' : (dl > 0 ? '▲ ' : '▼ ') + money(Math.abs(dl));
+const gapCls = g => 'num ' + (g > 500 ? 'down' : 'up');
+const gapText = g => g > 500 ? `⚠ 差 ${money(g)}，可能漏記` : `✓ 差 ${money(g)}`;
+
+/* 打字時只更新數字（不重畫整頁）：
+   重畫會換掉輸入框（手機鍵盤出問題），也會換掉「存」按鈕（填完直接按存會按不到） */
 export function onInput(el, ctx) {
   if (el.dataset.stock === undefined) return false;
-  ctx.state.stock.values[el.dataset.stock] = el.value;
-  const id = el.id, pos = el.selectionStart, y = window.scrollY;
-  ctx.render();
-  const again = document.getElementById(id);
-  again.focus();
-  try { again.setSelectionRange(pos, pos); } catch {}
-  window.scrollTo(0, y);
+  const data = ctx.state.data, st = ctx.state.stock, name = el.dataset.stock, i = el.id.replace('acc', '');
+  st.values[name] = el.value;
+  const v = toNum(el.value), pm = Logic.prevMonth(st.month);
+  const p = (data.stocktakes.find(x => x.month === pm && x.account === name) || { balance: 0 }).balance;
+  const dl = Logic.round2(v - p), dlEl = document.getElementById('dl' + i);
+  if (dlEl) { dlEl.className = deltaCls(dl); dlEl.textContent = deltaText(dl); }
+  const est = Logic.estimateMonthStart(data, name, st.month), gpEl = document.getElementById('gp' + i);
+  if (gpEl && est !== null) { const g = Logic.round2(Math.abs(v - est)); gpEl.className = gapCls(g); gpEl.textContent = gapText(g); }
+  const total = Logic.round2(data.accounts.reduce((sum, a) => sum + toNum(st.values[a.name]), 0));
+  const diff = Logic.round2(total - Logic.stocktakeTotal(data, Logic.prevMonth(st.month), 'all'));
+  document.getElementById('stTotal').textContent = fmt(total);
+  const d = document.getElementById('stDiff');
+  d.className = 'num ' + (diff >= 0 ? 'up' : 'down');
+  d.textContent = (diff >= 0 ? '▲ ' : '▼ ') + money(Math.abs(diff)) + ' 比上月';
   return true;
 }
 

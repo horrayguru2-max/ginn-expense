@@ -28,14 +28,6 @@ function catOptions(data, sel, year, filter) {
     return opts.length ? `<optgroup label="${GROUP_LABEL[g]}">${opts.map(c => `<option value="${esc(c.code)}" ${c.code === sel ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</optgroup>` : '';
   }).join('');
 }
-/* 重畫畫面，但游標留在原本的輸入框、位置不變 */
-function renderKeep(ctx, id) {
-  const el = document.getElementById(id), pos = el ? el.selectionStart : null, y = window.scrollY;
-  ctx.render();
-  const again = document.getElementById(id);
-  if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch {} }
-  window.scrollTo(0, y);
-}
 
 export function newDraft(ctx, over) {
   const data = ctx.state.data, pay = data.pay[0] ? data.pay[0].name : '';
@@ -70,6 +62,26 @@ function expenseHtml(ctx) {
     ${s.reading ? '<div class="reading"><span class="spin"></span>AI 正在讀 receipt…</div>' : s.draft ? draftHtml(ctx, s.draft) : ''}`;
 }
 
+function checkHtml(d) {
+  return d.needsCheck ? `<div class="confirm"><div><b>需確認：</b>${esc(d.checkReason || '請確認類別對不對')}</div><div class="row">
+      ${COMPUTER.test(d.merchant) ? '<button type="button" data-check="LIFESTYLE|自己">🧑 個人用 → Lifestyle</button><button type="button" data-check="BIZ_EQUIPMENT|TheGuruboss">💼 生意用 → 器材</button>' : ''}
+      <button type="button" data-check="ok">✓ 我確認過了</button></div></div>` : '';
+}
+
+/* 打字時只更新類別這幾個小地方，不重畫整張表單（輸入框被換掉的話，中文輸入法和手機鍵盤會出問題） */
+function updateCat(ctx) {
+  const d = ctx.state.draft, data = ctx.state.data, year = Logic.yearOf(d.date);
+  const c = catOf(data, d.category, d.date), g = c.group === 'tax_yearly' ? 'tax' : c.group;
+  const chip = document.getElementById('catChip');
+  if (chip) { chip.className = 'chip ' + g; chip.textContent = GROUP_LABEL[g]; }
+  const sel = document.getElementById('fCat');
+  if (sel) { sel.innerHTML = catOptions(data, d.category, year, d.catQ); sel.value = d.category; }
+  const info = document.getElementById('catInfo');
+  if (info) info.dataset.info = d.category;
+  const box = document.getElementById('checkBox');
+  if (box) box.innerHTML = checkHtml(d);
+}
+
 function draftHtml(ctx, d) {
   const data = ctx.state.data, year = Logic.yearOf(d.date), c = catOf(data, d.category, d.date);
   const g = c.group === 'tax_yearly' ? 'tax' : c.group;
@@ -83,13 +95,11 @@ function draftHtml(ctx, d) {
       <div class="field"><label for="fAmt">金額</label><input id="fAmt" class="amt" inputmode="decimal" value="${d.amount ?? ''}" placeholder="0.00"></div>
     </div>
     <div class="field"><label for="fMer">商家 / 內容</label><input id="fMer" value="${esc(d.merchant)}"></div>
-    <div class="field"><label for="fCat"><span>類別</span><span class="chip ${g}">${GROUP_LABEL[g]}</span></label>
+    <div class="field"><label for="fCat"><span>類別</span><span class="chip ${g}" id="catChip">${GROUP_LABEL[g]}</span></label>
       <input id="catQ" class="catq" value="${esc(d.catQ || '')}" placeholder="🔍 搜尋類別，例如：書、牙醫、Canva、血壓計" aria-label="搜尋類別" autocomplete="off">
       <div class="catrow"><select id="fCat">${catOptions(data, d.category, year, d.catQ)}</select>
-      <button type="button" class="info" data-info="${esc(d.category)}" data-year="${year}" aria-label="這個類別的扣稅說明">i</button></div></div>
-    ${d.needsCheck ? `<div class="confirm"><div><b>需確認：</b>${esc(d.checkReason || '請確認類別對不對')}</div><div class="row">
-      ${COMPUTER.test(d.merchant) ? '<button type="button" data-check="LIFESTYLE|自己">🧑 個人用 → Lifestyle</button><button type="button" data-check="BIZ_EQUIPMENT|TheGuruboss">💼 生意用 → 器材</button>' : ''}
-      <button type="button" data-check="ok">✓ 我確認過了</button></div></div>` : ''}
+      <button type="button" class="info" id="catInfo" data-info="${esc(d.category)}" data-year="${year}" aria-label="這個類別的扣稅說明">i</button></div></div>
+    <div id="checkBox">${checkHtml(d)}</div>
     <div class="field"><span class="lbl">付款方式</span><div class="chips">${data.pay.map(p => pick('pay', p.name, d.pay)).join('')}${adder(ctx, 'pay', '例如 Maybank CC')}</div></div>
     <div class="field"><span class="lbl"><span>從戶口扣</span><span class="hint">按付款方式自動選好，可以改</span></span><div class="chips">
       ${pick('from', '', d.account, '不扣（月底一次算）')}${data.accounts.map(a => pick('from', a.name, d.account)).join('')}</div></div>
@@ -215,29 +225,26 @@ export function onClick(el, ctx) {
   return false;
 }
 
-export function onInput(el, ctx) {
+export function onInput(el, ctx, e) {
   const s = ctx.state, d = s.draft;
-  if (!d) return false;
+  if (!d || (el.id !== 'fMer' && el.id !== 'catQ')) return false;
+  readDraft(s);
+  if (el.id === 'catQ') d.catQ = el.value;
+  if (e && e.isComposing) return true;          // 中文還在選字，等 compositionend
   if (el.id === 'fMer') {
-    readDraft(s);
     // 自己選過類別、或是在修改舊帳，就不要自動換
     if (d.catManual || d.id) return true;
     const g = Logic.guessCategory(s.data, d.merchant, d.date);
     if (g.category && (g.category !== d.category || g.needsCheck !== !!d.needsCheck)) {
       d.category = g.category; d.needsCheck = g.needsCheck; d.checkReason = g.reason;
-      renderKeep(ctx, 'fMer');
+      updateCat(ctx);
     }
     return true;
   }
-  if (el.id === 'catQ') {
-    readDraft(s);
-    d.catQ = el.value;
-    const hits = catMatches(s.data, Logic.yearOf(d.date), d.catQ);
-    if (d.catQ.trim() && hits.length) { d.category = hits[0].code; d.catManual = true; }
-    renderKeep(ctx, 'catQ');
-    return true;
-  }
-  return false;
+  const hits = catMatches(s.data, Logic.yearOf(d.date), d.catQ);
+  if (d.catQ.trim() && hits.length) { d.category = hits[0].code; d.catManual = true; }
+  updateCat(ctx);
+  return true;
 }
 
 export function onChange(el, ctx) {

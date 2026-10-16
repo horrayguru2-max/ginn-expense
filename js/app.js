@@ -125,5 +125,7 @@ document.addEventListener('click', e => {
 document.addEventListener('submit', e => { e.preventDefault(); dispatch('Submit', e.target, e); });
 document.addEventListener('change', e => dispatch('Change', e.target, e));
 document.addEventListener('input', e => dispatch('Input', e.target, e));
+// 中文輸入法選完字才算打完（選字中的 input 事件 isComposing = true，各 view 會先跳過）
+document.addEventListener('compositionend', e => dispatch('Input', e.target, e));
 
 if (getConfig()) ctx.reload(); else render();
