@@ -30,14 +30,25 @@ export async function call(action, payload) {
     if (!res.ok) throw new Error(res.error);
     return res.data;
   }
-  let r;
+  // 後台太久沒回應就停下來，不要一直轉（測試可用 ?apiTimeout=毫秒 改短）
+  const ms = Number(new URLSearchParams(location.search).get('apiTimeout')) || 60000;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  let r, j;
   try {
-    r = await fetch(cfg.url, { method: 'POST', body: JSON.stringify({ token: cfg.token, action, payload }) });
-  } catch {
-    throw new Error('連不上後台，請檢查網路，或確認網址是 Apps Script 部署後的 /exec 網址');
+    try {
+      r = await fetch(cfg.url, { method: 'POST', body: JSON.stringify({ token: cfg.token, action, payload }), signal: ctrl.signal });
+    } catch (e) {
+      if (ctrl.signal.aborted) throw new Error('後台太久沒回應。請確認 Apps Script 已經執行過 setup、已經部署，而且「誰可以存取」選的是「所有人」');
+      throw new Error('連不上後台，請檢查網路，或確認網址是 Apps Script 部署後的 /exec 網址');
+    }
+    try { j = await r.json(); } catch {
+      if (ctrl.signal.aborted) throw new Error('後台太久沒回應。請確認 Apps Script 已經執行過 setup、已經部署，而且「誰可以存取」選的是「所有人」');
+      throw new Error('後台的回應看不懂，請確認網址是 Apps Script 部署後的 /exec 網址');
+    }
+  } finally {
+    clearTimeout(timer);
   }
-  let j;
-  try { j = await r.json(); } catch { throw new Error('後台的回應看不懂，請確認網址是 Apps Script 部署後的 /exec 網址'); }
   if (!j.ok) throw new Error(j.error);
   return j.data;
 }
