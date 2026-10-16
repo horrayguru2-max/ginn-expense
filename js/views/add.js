@@ -13,10 +13,28 @@ function adder(ctx, kind, placeholder) {
     ? `<span class="addbox"><input id="newOpt" placeholder="${placeholder}" aria-label="新增的名稱"><button type="button" data-addok="${kind}">加</button></span>`
     : `<button type="button" class="pick add" data-adding="${kind}">➕ 新增…</button>`;
 }
-function catOptions(data, sel, year) {
-  const rules = Logic.rulesFor(data.categories, year);
-  return ['tax', 'biz', 'plain'].map(g => `<optgroup label="${GROUP_LABEL[g]}">${Object.values(rules).filter(c => c.group === g)
-    .map(c => `<option value="${esc(c.code)}" ${c.code === sel ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</optgroup>`).join('');
+/* 類別搜尋：比對名稱、代碼、「包括」裡的字 */
+function catMatches(data, year, text) {
+  const t = String(text || '').trim().toLowerCase();
+  const all = Object.values(Logic.rulesFor(data.categories, year)).filter(c => c.group !== 'tax_yearly');
+  if (!t) return all;
+  return all.filter(c => [c.name, c.code, c.include].join(' ').toLowerCase().includes(t));
+}
+function catOptions(data, sel, year, filter) {
+  let list = catMatches(data, year, filter);
+  if (!list.length) list = catMatches(data, year, '');
+  return ['tax', 'biz', 'plain'].map(g => {
+    const opts = list.filter(c => c.group === g);
+    return opts.length ? `<optgroup label="${GROUP_LABEL[g]}">${opts.map(c => `<option value="${esc(c.code)}" ${c.code === sel ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</optgroup>` : '';
+  }).join('');
+}
+/* 重畫畫面，但游標留在原本的輸入框、位置不變 */
+function renderKeep(ctx, id) {
+  const el = document.getElementById(id), pos = el ? el.selectionStart : null, y = window.scrollY;
+  ctx.render();
+  const again = document.getElementById(id);
+  if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch {} }
+  window.scrollTo(0, y);
 }
 
 export function newDraft(ctx, over) {
@@ -66,7 +84,8 @@ function draftHtml(ctx, d) {
     </div>
     <div class="field"><label for="fMer">商家 / 內容</label><input id="fMer" value="${esc(d.merchant)}"></div>
     <div class="field"><label for="fCat"><span>類別</span><span class="chip ${g}">${GROUP_LABEL[g]}</span></label>
-      <div class="catrow"><select id="fCat">${catOptions(data, d.category, year)}</select>
+      <input id="catQ" class="catq" value="${esc(d.catQ || '')}" placeholder="🔍 搜尋類別，例如：書、牙醫、Canva、血壓計" aria-label="搜尋類別" autocomplete="off">
+      <div class="catrow"><select id="fCat">${catOptions(data, d.category, year, d.catQ)}</select>
       <button type="button" class="info" data-info="${esc(d.category)}" data-year="${year}" aria-label="這個類別的扣稅說明">i</button></div></div>
     ${d.needsCheck ? `<div class="confirm"><div><b>需確認：</b>${esc(d.checkReason || '請確認類別對不對')}</div><div class="row">
       ${COMPUTER.test(d.merchant) ? '<button type="button" data-check="LIFESTYLE|自己">🧑 個人用 → Lifestyle</button><button type="button" data-check="BIZ_EQUIPMENT|TheGuruboss">💼 生意用 → 器材</button>' : ''}
@@ -196,9 +215,34 @@ export function onClick(el, ctx) {
   return false;
 }
 
+export function onInput(el, ctx) {
+  const s = ctx.state, d = s.draft;
+  if (!d) return false;
+  if (el.id === 'fMer') {
+    readDraft(s);
+    // 自己選過類別、或是在修改舊帳，就不要自動換
+    if (d.catManual || d.id) return true;
+    const g = Logic.guessCategory(s.data, d.merchant, d.date);
+    if (g.category && (g.category !== d.category || g.needsCheck !== !!d.needsCheck)) {
+      d.category = g.category; d.needsCheck = g.needsCheck; d.checkReason = g.reason;
+      renderKeep(ctx, 'fMer');
+    }
+    return true;
+  }
+  if (el.id === 'catQ') {
+    readDraft(s);
+    d.catQ = el.value;
+    const hits = catMatches(s.data, Logic.yearOf(d.date), d.catQ);
+    if (d.catQ.trim() && hits.length) { d.category = hits[0].code; d.catManual = true; }
+    renderKeep(ctx, 'catQ');
+    return true;
+  }
+  return false;
+}
+
 export function onChange(el, ctx) {
   const s = ctx.state;
-  if (el.id === 'fCat') { readDraft(s); ctx.render(); return true; }
+  if (el.id === 'fCat') { readDraft(s); s.draft.catManual = true; ctx.render(); return true; }
   if (el.id === 'fDate') { readDraft(s); ctx.render(); return true; }   // 年份變了，類別規則跟著換
   if (el.id === 'rcFiles' && el.files.length) { s.queue = Array.from(el.files); readNext(ctx); return true; }
   if (el.id === 'rcAttach' && el.files.length) { readDraft(s); attachOne(ctx, el.files[0]); return true; }

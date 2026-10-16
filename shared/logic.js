@@ -154,17 +154,37 @@ var Logic = (function () {
   }
 
   /* ---------- 打字快記 ---------- */
+  /* 由上往下找第一個符合的。from = 這條規則從哪一年開始適用 */
+  var BIZ_OR_ME = '這是個人用，還是 TheGuruboss 生意用？同一件東西只能報一邊。';
   var GUESS = [
-    [/電腦|laptop|手機|平板|ipad|iphone/i, 'LIFESTYLE', true],
-    [/午餐|晚餐|早餐|kopi|lunch|dinner|nasi|mamak|咖啡|teh|roti|吃/i, 'FOOD'],
-    [/grab|油|petrol|parking|停車|toll/i, 'TRANSPORT'],
-    [/canva|chatgpt|claude|adobe|elementor|google workspace/i, 'BIZ_SOFTWARE'],
-    [/hosting|hostinger|域名|domain/i, 'BIZ_HOSTING'],
-    [/gym|健身|羽毛球|badminton|球場|futsal/i, 'SPORTS'],
-    [/書|book|kindle|unifi|上網/i, 'LIFESTYLE'],
-    [/超市|aeon|lotus|jaya grocer|speedmart|日用/i, 'GROCERY'],
-    [/水電|電費|水費|tnb|air selangor|indah water/i, 'HOME']
+    { re: /電腦|laptop|macbook|手機|平板|ipad|iphone/i, code: 'LIFESTYLE', check: true, reason: BIZ_OR_ME },
+    { re: /運動鞋|球鞋|跑鞋/i, code: 'SPORTS', from: 2027 },
+    { re: /運動服|運動裝|運動鞋|球鞋|跑鞋|瑜伽褲|球衣/i, code: 'SHOPPING', check: true, reason: '運動服、運動鞋在 2026 年算個人衣物，不能扣稅（2027 年起運動鞋可以算 Sports，上限 RM300）' },
+    { re: /午餐|晚餐|早餐|kopi|lunch|dinner|nasi|mamak|咖啡|teh|roti|吃/i, code: 'FOOD' },
+    { re: /grab|油|petrol|parking|停車|toll/i, code: 'TRANSPORT' },
+    { re: /canva|chatgpt|claude|adobe|elementor|google workspace/i, code: 'BIZ_SOFTWARE' },
+    { re: /hosting|hostinger|域名|domain/i, code: 'BIZ_HOSTING' },
+    { re: /gym|健身|羽毛球|badminton|球場|futsal|球拍|瑜伽|yoga|游泳|運動器材/i, code: 'SPORTS' },
+    { re: /體檢|健康檢查|全身檢查|health screening/i, code: 'MEDICAL_CHECKUP' },
+    { re: /疫苗|vaccine/i, code: 'MEDICAL_VACCINE' },
+    { re: /牙醫|洗牙|dental/i, code: 'MEDICAL' },
+    { re: /門票|博物館|動物園|主題樂園|museum|zoo/i, code: 'TRAVEL_LOCAL' },
+    { re: /書(?!桌|架|櫃)|book|kindle|雜誌|unifi|上網/i, code: 'LIFESTYLE' },
+    { re: /超市|aeon|lotus|jaya grocer|speedmart|日用/i, code: 'GROCERY' },
+    { re: /水電|電費|水費|tnb|air selangor|indah water/i, code: 'HOME' }
   ];
+  /* 打內容猜類別：先看上面的關鍵字，再看類別表「包括」裡的字。猜不到回 category: null */
+  function guessCategory(data, text, date) {
+    var t = String(text || ''), year = yearOf(date);
+    var rules = rulesFor(data.categories, year);
+    var g = GUESS.find(function (x) { return (!x.from || year >= x.from) && x.re.test(t); });
+    if (g) return { category: g.code, needsCheck: !!g.check, reason: g.reason || '' };
+    var hit = Object.keys(rules).map(function (k) { return rules[k]; }).filter(function (c) { return c.group !== 'tax_yearly' && c.include; })
+      .find(function (c) {
+        return c.include.split(/[、；，,。（）()和等與\s]/).some(function (w) { return w.length >= 2 && t.indexOf(w) >= 0; });
+      });
+    return hit ? { category: hit.code, needsCheck: false, reason: '' } : { category: null, needsCheck: false, reason: '' };
+  }
   function escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
   function payAccount(data, payName) {
     var p = data.pay.find(function (x) { return x.name === payName; });
@@ -179,10 +199,10 @@ var Logic = (function () {
     var pay = pays.find(function (p) { return new RegExp(escRe(p), 'i').test(rest); });
     if (pay) rest = rest.replace(new RegExp(escRe(pay), 'i'), ' ');
     pay = pay || (data.pay[0] ? data.pay[0].name : '');
-    var g = GUESS.find(function (x) { return x[0].test(t); });
+    var g = guessCategory(data, t, today);
     return {
       date: today, merchant: rest.replace(/\s+/g, ' ').trim() || '（未填）', amount: amount,
-      category: g ? g[1] : 'OTHER', pay: pay, account: payAccount(data, pay), needsCheck: !!(g && g[2])
+      category: g.category || 'OTHER', pay: pay, account: payAccount(data, pay), needsCheck: g.needsCheck
     };
   }
 
@@ -247,7 +267,7 @@ var Logic = (function () {
     rulesFor: rulesFor, groupOf: groupOf, monthSpend: monthSpend, sourceIsBiz: sourceIsBiz, monthIncome: monthIncome,
     taxProgress: taxProgress, bizTotals: bizTotals,
     needsReceipt: needsReceipt, missingReceipts: missingReceipts, pendingClaims: pendingClaims, pendingRecurring: pendingRecurring,
-    payAccount: payAccount, parseQuick: parseQuick
+    payAccount: payAccount, parseQuick: parseQuick, guessCategory: guessCategory
   };
 })();
 if (typeof module !== 'undefined') module.exports = Logic;
