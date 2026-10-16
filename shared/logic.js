@@ -186,7 +186,59 @@ var Logic = (function () {
     };
   }
 
+  /* ---------- 搜尋 ----------
+     q = { text, period: 'month'|'year'|'all', kind: 'all'|'entry'|'income'|'transfer', pay, category, tag: ''|'tax'|'biz'|'claim'|'rc', today }
+     付款方式、類別、標籤只對花費有意義，選了就只留花費。多個字要全部符合。 */
+  function search(data, q) {
+    var words = String(q.text || '').toLowerCase().split(/\s+/).filter(Boolean);
+    var entryOnly = !!(q.pay || q.category || q.tag);
+    function inPeriod(date) {
+      if (q.period === 'month') return monthOf(date) === monthOf(q.today);
+      if (q.period === 'year') return yearOf(date) === yearOf(q.today);
+      return true;
+    }
+    function hit(fields) {
+      var hay = fields.filter(function (f) { return f !== undefined && f !== null && f !== ''; }).join(' ').toLowerCase();
+      return words.every(function (w) { return hay.indexOf(w) >= 0; });
+    }
+    var rows = [];
+    if (q.kind === 'all' || q.kind === 'entry') {
+      data.entries.forEach(function (e) {
+        if (!inPeriod(e.date)) return;
+        var c = rulesFor(data.categories, yearOf(e.date))[e.category] || {};
+        if (q.pay && e.pay !== q.pay) return;
+        if (q.category && e.category !== q.category && c.parent !== q.category) return;
+        if (q.tag === 'tax' && c.group !== 'tax') return;
+        if (q.tag === 'biz' && c.group !== 'biz') return;
+        if (q.tag === 'claim' && !(e.claimCo && !e.claimDone)) return;
+        if (q.tag === 'rc' && !(needsReceipt(data, e) && !e.receiptUrl)) return;
+        if (!hit([e.merchant, e.note, c.name, e.category, e.pay, e.account, e.use, e.claimCo, String(e.amount)])) return;
+        rows.push({ kind: 'entry', id: e.id, date: e.date, label: e.merchant, amount: round2(e.amount), record: e });
+      });
+    }
+    if (!entryOnly && (q.kind === 'all' || q.kind === 'income')) {
+      data.incomes.forEach(function (i) {
+        if (!inPeriod(i.date) || !hit([i.source, i.note, i.account, String(i.amount)])) return;
+        rows.push({ kind: 'income', id: i.id, date: i.date, label: '💰 ' + i.source, amount: round2(i.amount), record: i });
+      });
+    }
+    if (!entryOnly && (q.kind === 'all' || q.kind === 'transfer')) {
+      data.transfers.forEach(function (t) {
+        if (!inPeriod(t.date) || !hit([t.from, t.to, t.note, '轉帳', String(t.amount)])) return;
+        rows.push({ kind: 'transfer', id: t.id, date: t.date, label: '↔ ' + t.from + ' → ' + t.to, amount: round2(t.amount), record: t });
+      });
+    }
+    rows.sort(function (a, b) {
+      if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+      var ca = String(a.record.createdAt || ''), cb = String(b.record.createdAt || '');
+      return ca < cb ? 1 : ca > cb ? -1 : 0;
+    });
+    function total(kind) { return sumBy(rows.filter(function (r) { return r.kind === kind; })); }
+    return { rows: rows, count: rows.length, spend: total('entry'), income: total('income'), transfer: total('transfer') };
+  }
+
   return {
+    search: search,
     round2: round2, sumBy: sumBy, pad2: pad2, monthOf: monthOf, yearOf: yearOf, prevMonth: prevMonth, nextMonth: nextMonth,
     daysInMonth: daysInMonth, newId: newId, inScope: inScope,
     stocktakeBase: stocktakeBase, movements: movements, statement: statement, balanceNow: balanceNow,

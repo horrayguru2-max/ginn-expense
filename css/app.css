@@ -236,3 +236,11 @@ body{padding-block:0}
 .orow .ops button{border:1px solid var(--line);background:var(--card);border-radius:8px;min-width:32px;height:30px;padding:0 8px;font-size:13px}
 .orow .ops button:disabled{opacity:.35;cursor:default}
 .orow .ops button.warn{border-color:var(--bad);color:var(--bad)}
+
+/* ---------- 搜尋 ---------- */
+.srch{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--card);width:100%;font-size:16px}
+.filters{display:grid;gap:10px}
+.filters .seg{justify-self:start}
+.filters select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--card);width:100%;min-width:0}
+.sum{font-size:14px;color:var(--muted)}
+.sum b{color:var(--ink)}

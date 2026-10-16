@@ -7,8 +7,9 @@ import * as accounts from './views/accounts.js';
 import * as stocktake from './views/stocktake.js';
 import * as settings from './views/settings.js';
 import * as sheets from './views/sheets.js';
+import * as search from './views/search.js';
 
-const VIEWS = { home, add, accounts, balance: stocktake, settings };
+const VIEWS = { home, add, accounts, balance: stocktake, settings, search };
 const $ = s => document.querySelector(s);
 
 const state = { data: null, tab: 'home', scope: 'all', addMode: 'out', draft: null, incDraft: null, trDraft: null, loading: false, error: '' };
@@ -98,7 +99,7 @@ function render() {
     ? '<div class="banner"><span>示範模式：資料是假的，重新整理就會還原</span><button class="link" data-act="disconnect">連接我的 Google Sheet</button></div>'
     : '';
   screen.innerHTML = banner + VIEWS[state.tab].render(ctx);
-  const cur = state.tab === 'balance' ? 'accounts' : state.tab;
+  const cur = state.tab === 'balance' ? 'accounts' : state.tab === 'search' ? 'home' : state.tab;
   bar.querySelectorAll('button').forEach(b => b.setAttribute('aria-current', b.dataset.tab === cur ? 'page' : 'false'));
 }
 
