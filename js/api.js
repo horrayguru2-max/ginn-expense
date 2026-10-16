@@ -40,7 +40,8 @@ export async function call(action, payload) {
       r = await fetch(cfg.url, { method: 'POST', body: JSON.stringify({ token: cfg.token, action, payload }), signal: ctrl.signal });
     } catch (e) {
       if (ctrl.signal.aborted) throw new Error('後台太久沒回應。請確認 Apps Script 已經執行過 setup、已經部署，而且「誰可以存取」選的是「所有人」');
-      throw new Error('連不上後台，請檢查網路，或確認網址是 Apps Script 部署後的 /exec 網址');
+      // 部署時「誰可以存取」不是「所有人」→ Google 先要求登入，瀏覽器就擋掉，最常見的就是這個
+      throw new Error('連不上後台。最常見的原因：Apps Script 部署時「誰可以存取」沒有選「所有人」（部署 › 管理部署作業 › ✏️ 編輯 › 改成所有人）。也請確認網址是 /exec 結尾、網路正常');
     }
     try { j = await r.json(); } catch {
       if (ctrl.signal.aborted) throw new Error('後台太久沒回應。請確認 Apps Script 已經執行過 setup、已經部署，而且「誰可以存取」選的是「所有人」');
