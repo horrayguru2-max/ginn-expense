@@ -45,7 +45,7 @@ export function render(ctx) {
     <div class="view-head"><h2>設定</h2><span class="sub">自己加、刪、改名、排順序</span></div>
     ${listPanel(ctx, ...LISTS[0])}
     <div class="panel"><h3><span>付款方式 → 扣款戶口</span></h3>
-      <p style="margin:0 0 6px;font-size:13px;color:var(--muted)">用這個付款方式記帳時，自動從哪個戶口扣。信用卡和 TNG 選「不扣」，月頭盤點時一次算。每一筆記帳時還是可以手動改。</p>
+      <p style="margin:0 0 6px;font-size:13px;color:var(--muted)">用這個付款方式記帳時，自動從哪個戶口扣。想看 TNG、信用卡的餘額，就先在「戶口」加一個 TNG / 信用卡戶口，再在這裡選它；不想追蹤的選「不扣」，月頭盤點時一次算。每一筆記帳時還是可以手動改。</p>
       <div class="maps">${data.pay.map((p, i) => `<div class="map"><label for="pm${i}">${esc(p.name)}</label>
         <select id="pm${i}" data-paymap="${i}" aria-label="${esc(p.name)} 預設扣款戶口"><option value="" ${!p.account ? 'selected' : ''}>不扣（月底一次算）</option>
         ${data.accounts.map(a => `<option value="${esc(a.name)}" ${p.account === a.name ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></div>`).join('')}</div></div>
@@ -61,6 +61,13 @@ export function render(ctx) {
         <button class="btn ghost" data-act="disconnect">${cfg.mode === 'demo' ? '連接我的 Google Sheet' : '重新貼網址和密碼'}</button>
       </div></div>
   </div>`;
+}
+
+function linkPayHtml(pay, account, old) {
+  const total = old.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  return `<h3>之前的帳要一起補上嗎？</h3>
+    <p style="margin:0 0 12px;font-size:14px">之前有 <b>${old.length} 筆</b>用 ${esc(pay)} 付、還沒扣戶口的花費（共 <span class="num">${fmt(total, 2)}</span>）。<br>補上之後，這些花費會從「${esc(account)}」扣，戶口餘額會跟著變。</p>
+    <div class="two"><button class="btn ghost" data-close>不用，只管以後的</button><button class="btn" data-linkpay="${esc(pay)}" data-linkacc="${esc(account)}">一起補上</button></div>`;
 }
 
 function editAccountHtml(ctx, i) {
@@ -119,6 +126,12 @@ export function onClick(el, ctx) {
     saveList(ctx, kind, rows, '已刪除').catch(() => {});
     return true;
   }
+  if (d.linkpay) {
+    ctx.closeSheet();
+    ctx.act('linkPay', { pay: d.linkpay, account: d.linkacc })
+      .then(r => ctx.reload().then(() => ctx.toast(`已補上 ${r.changed} 筆，從${r.account}扣`))).catch(() => {});
+    return true;
+  }
   if (d.recurstop) {
     const rows = data.recurring.map(r => r.id === d.recurstop ? Object.assign({}, r, { active: false }) : r);
     const r = data.recurring.find(x => x.id === d.recurstop);
@@ -132,7 +145,11 @@ export function onChange(el, ctx) {
   if (el.dataset.paymap === undefined) return false;
   const data = ctx.state.data, i = Number(el.dataset.paymap);
   const rows = data.pay.map((p, j) => j === i ? Object.assign({}, p, { account: el.value }) : p);
-  ctx.act('saveSettings', { kind: 'pay', rows }, el.value ? `${rows[i].name} → 從${el.value}扣` : `${rows[i].name} → 不扣戶口`).catch(() => {});
+  const pay = rows[i].name, account = el.value;
+  ctx.act('saveSettings', { kind: 'pay', rows }, account ? `${pay} → 從${account}扣` : `${pay} → 不扣戶口`).then(() => {
+    const old = account ? ctx.state.data.entries.filter(e => e.pay === pay && !e.account) : [];
+    if (old.length) ctx.openSheet(linkPayHtml(pay, account, old));
+  }).catch(() => {});
   return true;
 }
 

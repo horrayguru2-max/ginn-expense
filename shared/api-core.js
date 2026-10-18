@@ -125,7 +125,17 @@ var ApiCore = (function () {
     return ok({ from: p.from, to: to, changed: changed });
   }
 
-  var WRITES = ['save', 'remove', 'saveStocktake', 'saveSettings', 'skipRecur', 'rename'];
+  /* 付款方式剛連上戶口：之前用這個付款方式、沒扣戶口的舊帳一起補上（已經有戶口的不動） */
+  function linkPay(p, deps) {
+    if (!deps.store.list('pay').some(function (r) { return r.name === p.pay; })) return fail('找不到付款方式「' + p.pay + '」');
+    if (!deps.store.list('account').some(function (r) { return r.name === p.account; })) return fail('找不到戶口「' + p.account + '」');
+    var rows = deps.store.list('entry'), changed = 0;
+    rows.forEach(function (e) { if (e.pay === p.pay && !e.account) { e.account = p.account; changed += 1; } });
+    if (changed) deps.store.replaceWhere('entry', function () { return true; }, rows);
+    return ok({ pay: p.pay, account: p.account, changed: changed });
+  }
+
+  var WRITES = ['save', 'remove', 'saveStocktake', 'saveSettings', 'skipRecur', 'rename', 'linkPay'];
 
   function handle(req, deps) {
     try {
@@ -141,6 +151,7 @@ var ApiCore = (function () {
           deps.store.upsert('skip', { id: p.recurId + '@' + p.month, recurId: p.recurId, month: p.month });
           res = ok({ recurId: p.recurId, month: p.month }); break;
         case 'rename': res = rename(p, deps); break;
+        case 'linkPay': res = linkPay(p, deps); break;
         case 'uploadReceipt': res = ok(deps.files.save(p.base64, p.mime, p.filename)); break;
         case 'readReceipt': res = readReceipt(p, deps); break;
         default: return fail('不認識的動作：' + (req && req.action));
