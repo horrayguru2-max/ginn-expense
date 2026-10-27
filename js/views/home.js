@@ -13,7 +13,7 @@ export function render(ctx) {
 
   const stMonth = data.stocktakes.some(x => x.month === month) ? month
     : (data.stocktakes.map(x => x.month).filter(m => m <= month).sort().pop() || month);
-  const assets = Logic.stocktakeTotal(data, stMonth, scope);
+  const assets = Logic.totalNow(data, today, scope);   // 跟「戶口」頁的「我全部的錢（大約）」同一個數字
   const prevAssets = Logic.stocktakeTotal(data, Logic.prevMonth(stMonth), scope);
   const dl = Logic.round2(assets - prevAssets);
 
@@ -36,7 +36,7 @@ export function render(ctx) {
     <div class="kpis">
       <div class="kpi"><div class="lb">本月花費（不含待 claim）</div><div class="v num">${money(spend)}</div></div>
       <div class="kpi"><div class="lb">本月收入</div><div class="v num">${money(inc)}</div></div>
-      <div class="kpi wide"><div><div class="lb">我全部的錢（${Number(stMonth.slice(5))}/1 盤點）</div><div class="v num">${money(assets)}</div></div>
+      <div class="kpi wide"><div><div class="lb">我全部的錢（大約）</div><div class="v num">${money(assets)}</div></div>
         ${prevAssets ? `<div class="delta num ${dl >= 0 ? 'up' : 'down'}">${dl >= 0 ? '▲' : '▼'} ${money(Math.abs(dl))} 比上月</div>` : ''}</div>
     </div>
     ${scope !== 'biz' && main ? `<button class="bank" data-bank>

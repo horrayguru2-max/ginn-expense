@@ -1,4 +1,4 @@
-const CACHE = 'expense-mvqw44m6';
+const CACHE = 'expense-mvqwl4kl';
 const SHELL = ['./', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'shared/logic.js', 'shared/seed.js', 'shared/schema.js', 'shared/memory-store.js', 'shared/api-core.js',
   'js/app.js', 'js/api.js', 'js/format.js', 'js/image.js',

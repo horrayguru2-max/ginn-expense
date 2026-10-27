@@ -87,8 +87,10 @@ var Logic = (function () {
       return s.month === month && inScope(accountIsBiz(data, s.account), scope);
     }), function (s) { return s.balance; });
   }
-  function totalNow(data, today) {
-    return round2(data.accounts.reduce(function (s, a) { return s + balanceNow(data, a.name, today); }, 0));
+  function totalNow(data, today, scope) {
+    return round2(data.accounts.reduce(function (s, a) {
+      return inScope(a.biz, scope || 'all') ? s + balanceNow(data, a.name, today) : s;
+    }, 0));
   }
 
   /* ---------- 類別、花費、收入 ---------- */
