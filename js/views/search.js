@@ -22,13 +22,29 @@ function otherRow(r) {
     <div class="a"><span class="num ${r.kind === 'income' ? 'up' : ''}">${r.kind === 'income' ? '＋' : ''}${money(r.amount)}</span></div></div>`;
 }
 
+/* 按月份分段，每段標題顯示那個月的花費合計，方便翻找 */
+function grouped(data, rows) {
+  const out = [];
+  let cur = null;
+  rows.forEach(r => {
+    const m = r.date.slice(0, 7);
+    if (m !== cur) {
+      cur = m;
+      const spend = Logic.sumBy(rows.filter(x => x.kind === 'entry' && x.date.slice(0, 7) === m));
+      out.push(`<div class="mhead"><b>${m.slice(0, 4)} 年 ${Number(m.slice(5))} 月</b>${spend ? `<span class="num">花費 ${money(spend)}</span>` : ''}</div>`);
+    }
+    out.push(r.kind === 'entry' ? entryRow(data, r.record) : otherRow(r));
+  });
+  return out.join('');
+}
+
 /* 結果另外畫在 #srchOut 裡：打字時只更新這一塊，輸入框不動（不然中文輸入法和手機鍵盤會壞） */
 function resultsHtml(ctx) {
   const data = ctx.state.data, s = q(ctx);
   const res = Logic.search(data, Object.assign({ today: ctx.today() }, s));
   const sums = [res.spend ? `花費 ${money(res.spend)}` : '', res.income ? `收入 ${money(res.income)}` : '', res.transfer ? `轉帳 ${money(res.transfer)}` : ''].filter(Boolean).join(' · ');
   return `<div class="sum"><b>共 ${res.count} 筆</b>${sums ? ' · ' + sums : ''}</div>
-    <div class="panel results"><div class="list">${res.rows.map(r => r.kind === 'entry' ? entryRow(data, r.record) : otherRow(r)).join('')
+    <div class="panel results"><div class="list">${grouped(data, res.rows)
       || '<div class="hint">找不到。試試少打幾個字，或把時間改成「全部」。</div>'}</div></div>`;
 }
 

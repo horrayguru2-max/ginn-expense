@@ -1,4 +1,4 @@
-/* 上傳前壓縮：JPEG、最長邊 ≤ 1600px、≤ 200KB。 */
+/* 上傳前壓縮：JPEG、最長邊 ≤ 1280px、≤ 150KB。 */
 function load(file) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -9,9 +9,9 @@ function load(file) {
   });
 }
 
-export async function compress(file, maxBytes = 200 * 1024) {
+export async function compress(file, maxBytes = 150 * 1024) {
   const img = await load(file);
-  let scale = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+  let scale = Math.min(1, 1280 / Math.max(img.naturalWidth, img.naturalHeight));
   const canvas = document.createElement('canvas');
   for (let round = 0; round < 6; round++) {
     canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
@@ -27,5 +27,5 @@ export async function compress(file, maxBytes = 200 * 1024) {
     }
     scale *= 0.75;
   }
-  throw new Error('圖片太大，壓不到 200KB，請截小一點再試');
+  throw new Error('圖片太大，壓不到 150KB，請截小一點再試');
 }

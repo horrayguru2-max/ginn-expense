@@ -246,3 +246,5 @@ body{padding-block:0}
 .sum b{color:var(--ink)}
 
 .catq{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--paper);width:100%;margin-bottom:6px;font-size:14px}
+.mhead{display:flex;justify-content:space-between;align-items:baseline;padding:10px 2px 4px;font-size:13px;color:var(--muted);position:sticky;top:0;background:var(--paper)}
+.mhead b{color:var(--ink)}

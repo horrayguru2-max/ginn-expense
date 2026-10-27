@@ -33,12 +33,24 @@ var Schema = (function () {
     if (field === 'month') {
       if ((m = s.match(/^(\d{1,2})[\/-](\d{4})$/))) return m[2] + '-' + pad2(m[1]);
       if ((m = s.match(/^(\d{4})[\/-](\d{1,2})$/))) return m[1] + '-' + pad2(m[2]);
+      if ((m = s.match(/^(\d{4})\s*年\s*(\d{1,2})\s*月?$/))) return m[1] + '-' + pad2(m[2]);
+      if ((m = s.match(/^(\d{4})[\/-](\d{1,2})[\/-]\d{1,2}$/))) return m[1] + '-' + pad2(m[2]);
     }
     return s;
   }
 
+  /* Ginn 自己在 Sheet 打的數字可能是文字：'1,234.50'、'RM 1,234'、'(120)'（括號 = 負數）。Number() 看不懂會變 0，所以先洗乾淨 */
+  function parseNum(v) {
+    if (v === '' || v === null || v === undefined) return 0;
+    if (typeof v === 'number') return isFinite(v) ? v : 0;
+    var s = String(v).trim();
+    var neg = /^\(.*\)$/.test(s) || /^-/.test(s) || /^RM\s*-/i.test(s);
+    var n = parseFloat(s.replace(/[^\d.]/g, ''));
+    return isNaN(n) ? 0 : (neg ? -n : n);
+  }
+
   function coerce(field, v, opts) {
-    if (NUM.indexOf(field) >= 0) return v === '' || v === null || v === undefined ? 0 : Number(v) || 0;
+    if (NUM.indexOf(field) >= 0) return parseNum(v);
     if (BOOL.indexOf(field) >= 0) {
       if (v === '' || v === null || v === undefined) return BOOL_DEFAULT_TRUE.indexOf(field) >= 0;
       return v === true || v === 'TRUE' || v === 'true' || v === '是';

@@ -60,12 +60,16 @@ export function render(ctx) {
     ${scope !== 'personal' ? `<div class="panel"><h3><span>💼 Freelance 生意開銷 ${year}</span><span class="num" style="color:var(--biz);font-weight:600">${fmt(Logic.sumBy(biz, x => x.total), 2)}</span></h3>
       ${biz.map(x => `<div class="bizline"><span>${esc(x.name)}</span><span class="num">${fmt(x.total, 2)}</span></div>`).join('') || '<div class="hint">今年還沒有生意開銷。</div>'}
       <div style="font-size:12px;color:var(--muted);margin-top:6px">直接從 Freelance 收入扣，沒有上限</div></div>` : ''}
-    <div class="panel"><h3><span>最近記帳</span><span style="display:flex;gap:14px"><button class="link" data-go="search">🔍 搜尋</button><button class="link" data-addmode="in">＋ 記收入</button><button class="link" data-addmode="out">＋ 記一筆</button></span></h3>
+    <div class="panel"><h3><span>最近記帳</span><span style="display:flex;gap:14px"><button class="link" data-allexp>📋 全部支出</button><button class="link" data-go="search">🔍 搜尋</button><button class="link" data-addmode="in">＋ 記收入</button><button class="link" data-addmode="out">＋ 記一筆</button></span></h3>
       <div class="list">${list.map(e => entryRow(data, e)).join('') || '<div class="hint">還沒有記帳。按下面的「記帳」開始。</div>'}</div></div>
   </div>`;
 }
 
 export function onClick(el, ctx) {
+  if ('allexp' in el.dataset) {
+    ctx.state.search = { text: '', period: 'all', kind: 'entry', pay: '', category: '', tag: '' };
+    ctx.go('search'); return true;
+  }
   if (el.dataset.scope) { ctx.state.scope = el.dataset.scope; ctx.render(); return true; }
   return false;
 }

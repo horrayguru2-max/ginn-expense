@@ -274,19 +274,17 @@ export function onSubmit(form, ctx) {
       receiptFileId: d.receiptFileId || '', receiptUrl: d.receiptUrl || '', note: d.note || '', createdAt: d.createdAt };
     const missingRc = Logic.needsReceipt(data, record) && !record.receiptFileId && !record.receiptUrl;
     const msg = missingRc ? '已存。📎 記得之後補 receipt' : record.account ? `已存，從${record.account}扣 ${fmt(amount, 2)}` : '已存';
-    ctx.act('save', { kind: 'entry', record }, msg).then(() => {
-      s.draft = null; s.confirmDelete = null;
-      if (s.queue && s.queue.length) readNext(ctx); else ctx.go('home');
-    }).catch(() => {});
+    ctx.actFast({ kind: 'entry', record }, msg).catch(() => {});
+    s.draft = null; s.confirmDelete = null;
+    if (s.queue && s.queue.length) readNext(ctx); else ctx.go('home');
     return true;
   }
   if (form.id === 'incForm') {
     readInc(s);
     const d = s.incDraft;
     const record = { id: d.id, date: d.date, source: d.source, amount: toNum(d.amount), account: d.account, note: d.note, createdAt: d.createdAt };
-    ctx.act('save', { kind: 'income', record }, r => `已存。存入${r.account} ${fmt(r.amount, 2)}`).then(() => {
-      s.incDraft = null; s.addMode = 'out'; ctx.go('home');
-    }).catch(() => {});
+    ctx.actFast({ kind: 'income', record }, r => `已存。存入${r.account} ${fmt(r.amount, 2)}`).catch(() => {});
+    s.incDraft = null; s.addMode = 'out'; ctx.go('home');
     return true;
   }
   if (form.id === 'trForm') {

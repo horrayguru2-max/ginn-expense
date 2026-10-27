@@ -74,6 +74,30 @@ export const ctx = {
       throw e;
     }
   },
+  /* 先在畫面上記好，再在後台慢慢存（Apps Script 一次要好幾秒）。後台失敗就還原並提醒。只用在 save。 */
+  actFast(payload, okMsg) {
+    const list = state.data[KEY[payload.kind]];
+    const rec = Object.assign({}, payload.record);
+    if (!rec.id) rec.id = Logic.newId();
+    if (!rec.createdAt) rec.createdAt = new Date().toISOString();
+    const idx = list.findIndex(r => r.id === rec.id);
+    const before = idx >= 0 ? list[idx] : null;
+    if (idx >= 0) list[idx] = rec; else list.push(rec);
+    render();
+    if (okMsg) ctx.toast(typeof okMsg === 'function' ? okMsg(rec) : okMsg);
+    return call('save', { kind: payload.kind, record: rec }).then(saved => {
+      const l = state.data[KEY[payload.kind]], i = l.findIndex(r => r.id === rec.id);
+      if (i >= 0) l[i] = saved;
+      render();
+      return saved;
+    }, e => {
+      const l = state.data[KEY[payload.kind]], i = l.findIndex(r => r.id === rec.id);
+      if (i >= 0) { if (before) l[i] = before; else l.splice(i, 1); }
+      render();
+      ctx.toast('沒存成功，已還原：' + e.message, true);
+      throw e;
+    });
+  },
   disconnect() { clearConfig(); state.data = null; state.error = ''; render(); }
 };
 
