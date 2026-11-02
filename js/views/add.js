@@ -57,7 +57,7 @@ function expenseHtml(ctx) {
   const s = ctx.state;
   return `<form class="quick" id="quickForm"><input id="quickIn" placeholder="例如：午餐 15 TNG" aria-label="打字快記" autocomplete="off"><button type="submit">記</button></form>
     <div class="photo-row"><span>有截圖或收據的話（可選，可以一次選多張）：</span>
-      <label class="btn ghost" style="width:auto;padding:8px 12px;font-size:13px;cursor:pointer">📷 拍照 / 選圖片<input type="file" id="rcFiles" accept="image/*" multiple hidden></label></div>
+      <label class="btn ghost" style="width:auto;padding:8px 12px;font-size:13px;cursor:pointer">📷 拍照 / 選圖片 / PDF<input type="file" id="rcFiles" accept="image/*,application/pdf" multiple hidden></label></div>
     ${s.queue && s.queue.length ? `<div class="hint">還有 ${s.queue.length} 張等著讀</div>` : ''}
     ${s.reading ? '<div class="reading"><span class="spin"></span>AI 正在讀 receipt…</div>' : s.draft ? draftHtml(ctx, s.draft) : ''}`;
 }
@@ -109,7 +109,7 @@ function draftHtml(ctx, d) {
       ${d.claim ? data.claimCos.map(x => pick('co', x.name, d.claimCo)).join('') + adder(ctx, 'claimCo', '公司名') : ''}</div></div>
     ${hasRc ? `<div class="thumb"><span class="img" aria-hidden="true"></span>📎 已附 receipt${d.receiptName ? ' · ' + esc(d.receiptName) : ''} · 會放到 Drive：${year}/${esc(d.category)}/</div>`
       : need ? `<div class="confirm"><div><b>📎 ${d.claim ? '要 claim' : '這筆可以扣稅或是生意開銷'}，建議附 receipt</b></div>
-          <div class="row"><label style="border:1px solid var(--warn);border-radius:999px;padding:4px 10px;font-size:13px;cursor:pointer">📷 現在附上<input type="file" id="rcAttach" accept="image/*" hidden></label></div>
+          <div class="row"><label style="border:1px solid var(--warn);border-radius:999px;padding:4px 10px;font-size:13px;cursor:pointer">📷 現在附上<input type="file" id="rcAttach" accept="image/*,application/pdf" hidden></label></div>
           <div style="color:var(--muted)">也可以先存，之後在首頁「缺 receipt」補上</div></div>`
       : '<div class="photo-row">一般開銷，不用 receipt</div>'}
     <div class="field"><label for="fNote">備註（可選）</label><input id="fNote" value="${esc(d.note || '')}"></div>

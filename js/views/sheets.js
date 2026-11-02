@@ -163,7 +163,7 @@ export function onClick(el, ctx) {
   if (d.rcfix) {
     const e = data.entries.find(x => x.id === d.rcfix);
     const input = document.createElement('input');
-    input.type = 'file'; input.accept = 'image/*';
+    input.type = 'file'; input.accept = 'image/*,application/pdf';
     input.onchange = async () => {
       if (!input.files.length) return;
       try {

@@ -1,4 +1,16 @@
-/* 上傳前壓縮：JPEG、最長邊 ≤ 1280px、≤ 150KB。 */
+/* 上傳前壓縮：JPEG、最長邊 ≤ 1280px、≤ 150KB。PDF 不壓縮，原檔上傳（≤ 5MB）。 */
+const MAX_PDF = 5 * 1024 * 1024;
+const isPdf = f => f.type === 'application/pdf' || /\.pdf$/i.test(f.name || '');
+
+function readPdf(file) {
+  return new Promise((resolve, reject) => {
+    if (file.size > MAX_PDF) return reject(new Error('PDF 太大（最多 5MB），請壓小一點或改用截圖'));
+    const r = new FileReader();
+    r.onload = () => resolve({ base64: String(r.result).split(',')[1], mime: 'application/pdf', filename: file.name || ('receipt-' + Date.now() + '.pdf'), bytes: file.size });
+    r.onerror = () => reject(new Error('讀不到這個 PDF'));
+    r.readAsDataURL(file);
+  });
+}
 function load(file) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -10,6 +22,7 @@ function load(file) {
 }
 
 export async function compress(file, maxBytes = 150 * 1024) {
+  if (isPdf(file)) return readPdf(file);
   const img = await load(file);
   let scale = Math.min(1, 1280 / Math.max(img.naturalWidth, img.naturalHeight));
   const canvas = document.createElement('canvas');
