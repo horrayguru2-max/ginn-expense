@@ -37,7 +37,7 @@ export function render(ctx) {
         const est = Logic.estimateMonthStart(data, a.name, month);
         const g = est === null ? null : Logic.round2(Math.abs(v - est));
         return `<div class="acct"><label class="nm" for="acc${i}">${esc(a.name)}${a.note ? ` <span class="chip plain">${esc(a.note)}</span>` : ''}${a.biz ? ' <span class="chip biz">💼 生意</span>' : ''}</label>
-          <input id="acc${i}" class="num" inputmode="decimal" value="${esc(st.values[a.name])}" data-stock="${esc(a.name)}">
+          <div style="display:flex;gap:6px"><input id="acc${i}" class="num" inputmode="decimal" value="${esc(st.values[a.name])}" data-stock="${esc(a.name)}" style="flex:1;min-width:0"><button type="button" class="btn" data-neg="acc${i}" aria-label="正負切換" style="width:auto;padding:0 14px">±</button></div>
           <div class="prev"><span>上月 ${money(p)}${a.where ? ` · 去 ${esc(a.where)} 看` : ''}</span><span id="dl${i}" class="${deltaCls(dl)}">${deltaText(dl)}</span></div>
           ${est !== null && a.group === 'daily' ? `<div class="prev"><span>App 推算 ${money(est)}（還卡、充 TNG 沒記，會偏高）</span><span id="gp${i}" class="${gapCls(g)}">${gapText(g)}</span></div>` : ''}
         </div>`;

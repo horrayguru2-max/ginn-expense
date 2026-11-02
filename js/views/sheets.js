@@ -48,7 +48,7 @@ export function bankHtml(ctx, name) {
     <form class="receipt" id="adjForm" data-account="${esc(name)}">
       <div class="ai">🔧 跟${esc(a.where || '銀行 app')}對不上？填它現在顯示的餘額</div>
       <div class="two">
-        <div class="field"><label for="adjAmt">實際餘額</label><input id="adjAmt" class="amt" inputmode="decimal" placeholder="0.00"></div>
+        <div class="field"><label for="adjAmt">實際餘額</label><div style="display:flex;gap:6px"><input id="adjAmt" class="amt" inputmode="decimal" placeholder="0.00" style="flex:1;min-width:0"><button type="button" class="btn" data-neg="adjAmt" aria-label="正負切換" style="width:auto;padding:0 14px">±</button></div></div>
         <div class="field"><label for="adjNote">備註（可選）</label><input id="adjNote" placeholder="例如 還了信用卡"></div>
       </div>
       <button class="btn" type="submit">校正</button>
@@ -116,6 +116,11 @@ export function detailHtml(ctx, code, year) {
 
 export function onClick(el, ctx) {
   const d = el.dataset, data = ctx.state && ctx.state.data;
+  if (d.neg) {   // 手機數字鍵盤沒有負號：± 按鈕切換（信用卡欠款 = 負數）
+    const inp = document.getElementById(d.neg);
+    if (inp) { inp.value = inp.value.trim().startsWith('-') ? inp.value.trim().slice(1) : '-' + inp.value.trim(); inp.dispatchEvent(new Event('input', { bubbles: true })); inp.focus(); }
+    return true;
+  }
   if (!data) return false;
   if (d.edit) {
     const [kind, id] = d.edit.split(':');
