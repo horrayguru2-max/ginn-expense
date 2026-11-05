@@ -64,6 +64,19 @@ export function claimHtml(ctx) {
     <div style="font-size:13px;color:var(--muted)">公司付回來之後按「已 claim」。待 claim 的錢不算進你自己的花費。</div>`;
 }
 
+export function claimPickHtml(ctx, e) {
+  const data = ctx.state.data;
+  const names = data.accounts.map(a => a.name);
+  const def = e.account && names.includes(e.account) ? e.account : mainAccount(data);
+  return `<h3>✓ ${esc(e.claimCo)} 付回來了</h3>
+    <div class="cap"><span>${esc(e.merchant)}</span><span class="num">${fmt(e.amount, 2)}</span></div>
+    <div class="field"><label for="claimAcct">錢進哪個戶口？</label>
+      <select id="claimAcct">${names.map(n => `<option value="${esc(n)}"${n === def ? ' selected' : ''}>${esc(n)}</option>`).join('')}<option value="">不入戶口（只標記已 claim）</option></select></div>
+    <div style="font-size:13px;color:var(--muted)">會記成一筆轉帳進那個戶口，不算收入，也不影響扣稅。</div>
+    <button class="btn" data-claimconfirm="${esc(e.id)}">確認</button>
+    <button class="link" data-claimback="1" style="justify-self:start">← 返回</button>`;
+}
+
 export function rcHtml(ctx) {
   const data = ctx.state.data, mr = Logic.missingReceipts(data);
   return `<h3>📎 缺 receipt</h3>
@@ -182,12 +195,23 @@ export function onClick(el, ctx) {
   if (d.pending) { ctx.openSheet({ claim: claimHtml, rc: rcHtml, recur: recurHtml }[d.pending](ctx)); return true; }
   if (d.detail) { ctx.openSheet(detailHtml(ctx, d.detail, Number(d.year) || Number(ctx.today().slice(0, 4)))); return true; }
   if (d.info) { ctx.openSheet(infoHtml(ctx, d.info, Number(d.year) || Number(ctx.today().slice(0, 4)))); return true; }
-  if (d.claimdone) {
+  if (d.claimdone) {   // 先問錢進哪個戶口
     const e = data.entries.find(x => x.id === d.claimdone);
+    if (e) ctx.openSheet(claimPickHtml(ctx, e));
+    return true;
+  }
+  if (d.claimconfirm) {
+    const e = data.entries.find(x => x.id === d.claimconfirm);
+    if (!e) return true;
+    const acct = (document.getElementById('claimAcct') || {}).value || '';
     ctx.act('save', { kind: 'entry', record: Object.assign({}, e, { claimDone: true }) }, `已標記：${e.claimCo} 付回來了`)
+      .then(() => acct ? ctx.act('save', { kind: 'transfer', record: {
+        date: ctx.today(), from: `Claim 還款 · ${e.claimCo}`, to: acct, amount: e.amount, note: e.merchant } },
+        `${money(e.amount)} 已進 ${acct}`) : null)
       .then(() => ctx.openSheet(claimHtml(ctx))).catch(() => {});
     return true;
   }
+  if (d.claimback) { ctx.openSheet(claimHtml(ctx)); return true; }
   if (d.recurok) {
     const r = data.recurring.find(x => x.id === d.recurok);
     ctx.act('save', { kind: 'transfer', record: { date: ctx.today(), from: r.from, to: r.to, amount: r.amount, note: r.note, recurId: r.id } },
